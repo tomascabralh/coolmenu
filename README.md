@@ -41,3 +41,7 @@ All shortcuts, zones and layouts are editable in Settings.
 
 `~/Library/Application Support/CoolMenu/`: `settings.json`, `history.json`, and `clips/` (images
 and rich text). Delete the folder to reset.
+
+## License
+
+[MIT](LICENSE)
