@@ -50,10 +50,8 @@ final class SwitcherController: ObservableObject {
                 let center = HotKeyCenter.shared
                 center.unregister(group: "switcher")
                 guard enabled else { return }
-                var reverse = combo
-                reverse.modifiers |= HotKeyCombo.shift
                 center.register(group: "switcher", combo) { SwitcherController.shared.step(by: 1, combo: combo) }
-                if reverse != combo {
+                if let reverse = HotKeyConflicts.switcherReverse(of: combo) {
                     center.register(group: "switcher", reverse) { SwitcherController.shared.step(by: -1, combo: combo) }
                 }
                 center.register(group: "switcher", searchCombo) { SwitcherController.shared.openSearch() }

@@ -8,6 +8,8 @@
 	<string>CoolMenu</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.coolmenu.CoolMenu</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
 	<string>CoolMenu</string>
 	<key>CFBundlePackageType</key>

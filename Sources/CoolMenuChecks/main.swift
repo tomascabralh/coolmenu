@@ -50,6 +50,9 @@ check(ZoneCycler.nextIndex(current: snapped, candidates: [a, b, c], lastIndex: 0
 check(ZoneCycler.nextIndex(current: elsewhere, candidates: [a, b, c], lastIndex: 1, lastResult: snapped) == 0,
       "moved window restarts the cycle")
 check(ZoneCycler.nextIndex(current: a, candidates: [], lastIndex: nil, lastResult: nil) == nil, "no candidates")
+check(ZoneCycler.nextIndex(current: a, candidates: [a], lastIndex: 0, lastResult: a) == 0, "single zone stays put")
+check(ZoneCycler.nextIndex(current: elsewhere, candidates: [a, b], lastIndex: 5, lastResult: nil) == 0,
+      "stale index without a last result restarts")
 
 // MARK: Grid
 
@@ -80,8 +83,56 @@ check(roundTrip == settings, "settings survive JSON round trip")
 let partial = try! JSONDecoder().decode(AppSettings.self, from: Data(#"{"windowGap": 12, "clipboardLimit": "bad"}"#.utf8))
 check(partial.windowGap == 12 && partial.clipboardLimit == 0 && partial.layouts.map(\.name) == settings.layouts.map(\.name),
       "missing and invalid keys fall back per key, valid ones survive")
-let combos = settings.windowBindings.map(\.combo) + [settings.clipboardHotKey, settings.switcherHotKey, settings.switcherSearchHotKey]
-check(Set(combos).count == combos.count, "default shortcuts don't collide")
+check(HotKeyConflicts.duplicates(in: settings).isEmpty, "default shortcuts don't collide, including the switcher's reverse step")
+check(HotKeyCombo(keyCode: KeyCode.v, modifiers: HotKeyCombo.command | HotKeyCombo.shift).displayString == "⇧⌘V", "modifier order")
+check(KeyNames.label(for: KeyCode.space) == "Space" && KeyNames.label(for: 999) == "Key 999", "key labels with fallback")
+
+let windowAction = WindowAction.zones(["Left Half", "Left Third"])
+check(try! JSONDecoder().decode(WindowAction.self, from: JSONEncoder().encode(windowAction)) == windowAction,
+      "window actions with zones survive JSON round trip")
+
+// MARK: Shortcut conflicts
+
+let ctrlOpt = HotKeyCombo.control | HotKeyCombo.option
+let optTab = HotKeyCombo(keyCode: KeyCode.tab, modifiers: HotKeyCombo.option)
+let optShiftTab = HotKeyCombo(keyCode: KeyCode.tab, modifiers: HotKeyCombo.option | HotKeyCombo.shift)
+check(HotKeyConflicts.switcherReverse(of: optTab) == optShiftTab && HotKeyConflicts.switcherReverse(of: optShiftTab) == nil,
+      "switcher reverse adds shift, none when shift is already held")
+
+var clash = AppSettings()
+clash.clipboardHotKey = optShiftTab
+check(HotKeyConflicts.duplicates(in: clash)[optShiftTab]?.sorted() == ["Clipboard history", "Switch windows backwards"],
+      "implicit reverse step counts as a use")
+check(HotKeyConflicts.conflicts(label: HotKeyConflicts.switcherLabel, combo: optTab, in: clash) == ["Clipboard history"],
+      "switcher recorder warns about a clash on its reverse step")
+check(HotKeyConflicts.conflicts(label: HotKeyConflicts.clipboardLabel, combo: optShiftTab, in: clash) == ["Switch windows backwards"],
+      "the other side of the clash warns too")
+clash.switcherEnabled = false
+check(HotKeyConflicts.duplicates(in: clash).isEmpty, "a disabled switcher registers nothing")
+check(HotKeyConflicts.conflicts(label: HotKeyConflicts.switcherSearchLabel, combo: clash.switcherSearchHotKey, in: clash).isEmpty,
+      "unregistered shortcut never conflicts")
+
+var twins = AppSettings()
+let blank = WindowBinding(combo: HotKeyCombo(keyCode: KeyCode.e, modifiers: ctrlOpt | HotKeyCombo.shift), action: .zones([]))
+twins.windowBindings += [blank, WindowBinding(combo: blank.combo, action: .zones([]))]
+check(HotKeyConflicts.conflicts(label: HotKeyConflicts.label(for: blank), combo: blank.combo, in: twins) == ["Windows: No zones"],
+      "two identical bindings still flag each other")
+check(HotKeyConflicts.conflicts(label: HotKeyConflicts.clipboardLabel, combo: twins.clipboardHotKey, in: twins).isEmpty,
+      "unique shortcut has no conflicts")
+
+// MARK: Defaults
+
+let allZoneNames = Set(DefaultLayouts.all.flatMap(\.zones).map(\.name))
+let boundZoneNames = DefaultBindings.window.flatMap { binding -> [String] in
+    if case .zones(let names) = binding.action { return names }
+    return []
+}
+check(boundZoneNames.allSatisfy(allZoneNames.contains), "every default binding names a zone some default layout has")
+for layout in DefaultLayouts.all {
+    check(Set(layout.zones.map(\.name)).count == layout.zones.count, "\(layout.name): zone names are unique")
+    check(layout.zones.allSatisfy { $0.x >= 0 && $0.y >= 0 && $0.width > 0 && $0.height > 0
+        && $0.x + $0.width <= 1 + 1e-9 && $0.y + $0.height <= 1 + 1e-9 }, "\(layout.name): zones stay on screen")
+}
 
 // MARK: Clipboard history
 
@@ -128,6 +179,9 @@ check(chrome?.members.first?.pid == 101, "members sorted by CPU")
 
 check(abs(CPUTicks.usage(from: CPUTicks(user: 0, system: 0, idle: 0, nice: 0),
                          to: CPUTicks(user: 30, system: 10, idle: 60, nice: 0)) - 0.4) < 1e-9, "cpu usage")
+
+check(ByteFormat.short(1024 * 1024).contains("MB") && ByteFormat.short(3 * 1024 * 1024 * 1024).contains("GB"), "byte units")
+check(!ByteFormat.short(.max).isEmpty, "huge byte counts clamp instead of trapping")
 
 // MARK: Fuzzy
 

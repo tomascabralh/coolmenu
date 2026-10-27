@@ -10,7 +10,8 @@ Requires macOS 14+. Builds with Xcode Command Line Tools alone (no Xcode project
 
 ```sh
 scripts/build-app.sh --open     # release build -> build/CoolMenu.app, then launch
-swift run CoolMenuChecks        # core logic checks (geometry, cycling, grouping, history)
+swift run CoolMenuChecks        # core logic checks (geometry, cycling, grouping, history, shortcuts)
+scripts/package.sh              # release zip + dmg in dist/
 ```
 
 On first launch, grant **Accessibility** in System Settings > Privacy & Security. It drives
@@ -20,6 +21,17 @@ Run `scripts/make-dev-cert.sh` once first. It creates a self-signed "CoolMenu De
 which the build script then picks up automatically. Without it, builds are ad-hoc signed, the
 signature changes every build, and macOS silently stops honoring the Accessibility grant (the
 toggle still shows on). The fix then is to remove CoolMenu from the list and add it again.
+
+## Distributing
+
+`scripts/package.sh` writes `dist/CoolMenu-<version>.zip` and `.dmg` (drag to Applications). The
+version is `CFBundleShortVersionString` in `Resources/Info.plist`; the build number is the commit
+count. Without a Developer ID the build is self-signed, so on other Macs Gatekeeper blocks it until
+you right-click > Open. With a paid developer account, set `COOLMENU_SIGN_IDENTITY` to your
+"Developer ID Application" identity and `COOLMENU_NOTARY_PROFILE` to a `notarytool` keychain
+profile, and the script notarizes and staples both. Details are in the script header.
+
+CI (GitHub Actions) builds, runs the checks and uploads an ad-hoc signed app on every push and PR.
 
 ## Modules
 
@@ -35,7 +47,9 @@ toggle still shows on). The fix then is to remove CoolMenu from the list and add
 | Display dimming | menubar, Settings > Displays | Software (gamma) dimming per display, works on any monitor. |
 | Keyboard cleaning | menubar, Settings > Keyboard | Blocks all keys; the mouse unlocks, and it times out on its own. |
 
-All shortcuts, zones and layouts are editable in Settings.
+All shortcuts, zones and layouts are editable in Settings. A shortcut that clashes with another
+CoolMenu shortcut (including the switcher's ⇧ reverse step), or that macOS refuses, gets a warning
+icon in Settings; hover it to see what it clashes with.
 
 ## Data
 
