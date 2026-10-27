@@ -4,12 +4,36 @@ import SwiftUI
 
 /// Click, then press a shortcut. Global shortcuts are suspended while recording so an existing
 /// binding reaches the recorder. Esc cancels; a shortcut needs ⌃, ⌥ or ⌘.
+/// `label` names what the shortcut does (see `HotKeyConflicts`), so a combo used elsewhere too
+/// gets a warning naming the other use.
 struct KeyRecorder: View {
     @Binding var combo: HotKeyCombo
+    var label: String? = nil
+    @ObservedObject private var store = SettingsStore.shared
+    @ObservedObject private var hotKeys = HotKeyCenter.shared
     @State private var recording = false
     @State private var monitor: Any?
 
+    private var warning: String? {
+        let others = label.map { HotKeyConflicts.conflicts(label: $0, combo: combo, in: store.settings) } ?? []
+        if !others.isEmpty { return "Also used by: \(others.joined(separator: ", ")). Only one of them will work." }
+        if hotKeys.failed.contains(combo) { return "macOS refused this shortcut; it is reserved or already taken." }
+        return nil
+    }
+
     var body: some View {
+        HStack(spacing: 6) {
+            if let warning, !recording {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .help(warning)
+                    .accessibilityLabel(warning)
+            }
+            recorderButton
+        }
+    }
+
+    private var recorderButton: some View {
         Button {
             recording ? stop() : start()
         } label: {

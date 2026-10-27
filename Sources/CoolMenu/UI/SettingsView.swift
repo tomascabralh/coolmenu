@@ -134,7 +134,7 @@ private struct BindingsEditor: View {
             List {
                 ForEach($store.settings.windowBindings) { $binding in
                     HStack(alignment: .center, spacing: 12) {
-                        KeyRecorder(combo: $binding.combo)
+                        KeyRecorder(combo: $binding.combo, label: HotKeyConflicts.label(for: binding))
                         actionEditor($binding.action)
                         Spacer()
                         Button(role: .destructive) {
@@ -364,7 +364,7 @@ private struct ClipboardSettings: View {
         Form {
             Section("History") {
                 Toggle("Record clipboard history", isOn: $store.settings.clipboardEnabled)
-                LabeledContent("Open history") { KeyRecorder(combo: $store.settings.clipboardHotKey) }
+                LabeledContent("Open history") { KeyRecorder(combo: $store.settings.clipboardHotKey, label: HotKeyConflicts.clipboardLabel) }
                 Picker("Keep", selection: $store.settings.clipboardLimit) {
                     Text("Unlimited").tag(0)
                     Text("100 items").tag(100)
@@ -428,8 +428,8 @@ private struct SwitcherSettings: View {
         Form {
             Section("Window switcher") {
                 Toggle("Enable", isOn: $store.settings.switcherEnabled)
-                LabeledContent("Switch windows") { KeyRecorder(combo: $store.settings.switcherHotKey) }
-                LabeledContent("Search windows") { KeyRecorder(combo: $store.settings.switcherSearchHotKey) }
+                LabeledContent("Switch windows") { KeyRecorder(combo: $store.settings.switcherHotKey, label: HotKeyConflicts.switcherLabel) }
+                LabeledContent("Search windows") { KeyRecorder(combo: $store.settings.switcherSearchHotKey, label: HotKeyConflicts.switcherSearchLabel) }
             }
             Section("How it works") {
                 Text("Hold the modifier and tap the key to step through windows; release to switch. Add ⇧ to step backwards. A quick tap jumps to your previous window. Start typing while it's open to search by window title or app name.")

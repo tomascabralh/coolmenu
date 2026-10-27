@@ -9,6 +9,9 @@ Personal project, not a Convey product.
 
 - `scripts/build-app.sh [--open] [--debug]`: builds `build/CoolMenu.app` (Info.plist from `Resources/`).
   `--open` kills any running instance first and waits for it to exit before launching.
+- `scripts/package.sh`: release zip + dmg into `dist/`. Notarizes only when `COOLMENU_SIGN_IDENTITY`
+  is a Developer ID and `COOLMENU_NOTARY_PROFILE` is set; otherwise warns and ships self-signed.
+- `swift scripts/make-icon.swift`: regenerates `Resources/AppIcon.icns` (drawn in code, committed).
 - `scripts/make-dev-cert.sh`: run once per machine. Creates the self-signed "CoolMenu Dev" identity
   the build script signs with. Without it builds are ad-hoc signed, the signature changes every
   build, and macOS silently stops honoring the Accessibility grant (the toggle still shows on).
@@ -50,6 +53,12 @@ Personal project, not a Convey product.
   Never mix the two.
 - **Hotkeys** go through `HotKeyCenter` (Carbon, no permission). Each module owns a group and
   re-registers it from `SettingsStore.observe`. `KeyRecorder` suspends all hotkeys while recording.
+  `HotKeyConflicts.uses(in:)` (Core) must mirror what the modules actually register, or Settings'
+  clash warnings drift; a new module shortcut goes in both places. Carbon refuses a duplicate combo
+  within the process, and `HotKeyCenter.failed` reports refused registrations.
+- **iCloud Desktop:** the repo may sit in a synced folder, whose file provider tags bundles with
+  FinderInfo and breaks `codesign` at random. `build-app.sh` therefore signs in a temp dir and marks
+  `build/` with `com.apple.fileprovider.ignore#P`. Don't "simplify" that back to in-place signing.
 - **Panels** (clipboard, switcher) are non-activating `FloatingPanel`s, so the previous app stays
   frontmost and synthesized ⌘V lands there. Don't activate CoolMenu before pasting.
 - **Clipboard** history is local-only by design: no iCloud or any sync. Concealed/transient

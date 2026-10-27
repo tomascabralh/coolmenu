@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # build-app.sh stamps CFBundleVersion with the commit count.
+          fetch-depth: 0
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Core checks
+        run: swift run CoolMenuChecks
+
+      # No signing identity on the runner, so this is ad-hoc signed: good for catching bundle and
+      # script breakage, not for distribution (see scripts/package.sh).
+      - name: Build app bundle
+        run: |
+          scripts/build-app.sh
+          codesign --verify --strict build/CoolMenu.app
+          ditto -c -k --keepParent build/CoolMenu.app CoolMenu.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CoolMenu-${{ github.sha }}
+          path: CoolMenu.zip
+          retention-days: 14

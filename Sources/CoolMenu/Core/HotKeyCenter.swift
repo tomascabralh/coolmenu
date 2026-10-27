@@ -1,11 +1,12 @@
 import Carbon.HIToolbox
+import Combine
 import CoolMenuCore
 import Foundation
 
 /// Global shortcuts through Carbon's RegisterEventHotKey: no permission prompt and the key is
 /// consumed, so the focused app never sees it. Registrations are grouped so each module can
 /// replace its own set when settings change.
-final class HotKeyCenter {
+final class HotKeyCenter: ObservableObject {
     static let shared = HotKeyCenter()
 
     private struct Entry {
@@ -18,6 +19,9 @@ final class HotKeyCenter {
     private var entries: [UInt32: Entry] = [:]
     private var nextID: UInt32 = 1
     private var suspended = false
+    /// Combos whose registration was refused (taken by macOS, or registered twice). Settings shows
+    /// a warning next to them. Left untouched while suspended, when nothing is registered.
+    @Published private(set) var failed: Set<HotKeyCombo> = []
     private static let signature: OSType = 0x434D_4E55 // "CMNU"
 
     private init() {
@@ -40,6 +44,7 @@ final class HotKeyCenter {
         var entry = Entry(group: group, combo: combo, handler: handler, ref: nil)
         if !suspended { entry.ref = install(combo, id: id) }
         entries[id] = entry
+        refreshFailed()
     }
 
     func unregister(group: String) {
@@ -47,6 +52,7 @@ final class HotKeyCenter {
             if let ref = entry.ref { UnregisterEventHotKey(ref) }
             entries[id] = nil
         }
+        refreshFailed()
     }
 
     /// Releases every key while a shortcut recorder is listening, so pressing an existing
@@ -66,6 +72,7 @@ final class HotKeyCenter {
         for (id, entry) in entries {
             entries[id]?.ref = install(entry.combo, id: id)
         }
+        refreshFailed()
     }
 
     private func install(_ combo: HotKeyCombo, id: UInt32) -> EventHotKeyRef? {
@@ -76,6 +83,12 @@ final class HotKeyCenter {
             Log.write("hotkeys: could not register \(combo.displayString) (status \(status)); another app may own it")
         }
         return ref
+    }
+
+    private func refreshFailed() {
+        guard !suspended else { return }
+        let now = Set(entries.values.filter { $0.ref == nil }.map(\.combo))
+        if now != failed { failed = now }
     }
 
     private func fire(_ id: UInt32) {
